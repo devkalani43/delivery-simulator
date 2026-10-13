@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Enterprise Delivery Simulator OS</title>
+    <style>
+        :root {
+            --primary: #e84118; --secondary: #4cd137; --dark: #2f3640; --light: #f5f6fa;
+            --blue: #00a8ff; --warn: #fbc531; --danger: #c23616;
+            --font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font); user-select: none; }
+        body { background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+
+        #device {
+            width: 100%; max-width: 420px; height: 100vh; max-height: 900px;
+            background: var(--light); position: relative; display: flex; flex-direction: column;
+            box-shadow: 0 0 30px rgba(0,0,0,0.9); overflow: hidden;
+        }
+
+        /* --- OS HEADER --- */
+        .os-bar { background: var(--dark); color: white; padding: 10px 15px; display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: bold; z-index: 1000;}
+        .weather-alert { color: var(--blue); animation: blink 2s infinite; display: none; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        .tabs { display: flex; background: #fff; border-bottom: 2px solid #ddd; z-index: 100; }
+        .tab { flex: 1; padding: 12px 0; text-align: center; font-weight: bold; color: #7f8fa6; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; }
+        .tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: #fdfafb; }
+
+        .view { display: none; flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; background: var(--light); padding-bottom: 80px;}
+        .view.active { display: block; animation: fade 0.3s ease; }
+        @keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- CUSTOMER UI --- */
+        .banner { background: linear-gradient(135deg, var(--primary), #c23616); color: white; padding: 20px; text-align: center; }
+        .menu-grid { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .item-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; position: relative; overflow: hidden;}
+        .item-card img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
+        .item-title { font-weight: bold; font-size: 0.95rem; margin-bottom: 5px; color: var(--dark); }
+        .item-price { color: var(--secondary); font-weight: 900; margin-bottom: 10px; }
+        .add-btn { background: var(--light); color: var(--primary); border: 2px solid var(--primary); padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s;}
+        .add-btn:active { background: var(--primary); color: white; }
+        .surge-badge { position: absolute; top: 5px; right: 5px; background: var(--danger); color: white; font-size: 0.6rem; padding: 3px 6px; border-radius: 10px; font-weight: bold; display: none;}
+
+        .cart-modal { position: absolute; bottom: 0; width: 100%; background: white; padding: 20px; border-top-left-radius: 20px; border-top-right-radius: 20px; box-shadow: 0 -10px 20px rgba(0,0,0,0.1); transform: translateY(100%); transition: 0.3s; z-index: 500;}
+        .cart-modal.open { transform: translateY(0); }
+        .bill-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; color: #555; }
+        .bill-row.total { font-weight: bold; font-size: 1.2rem; color: var(--dark); border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px; }
+        .promo-box { display: flex; gap: 10px; margin: 15px 0; }
+        .promo-box input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+        .promo-box button { background: var(--dark); color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; }
+        .checkout-btn { width: 100%; background: var(--primary); color: white; padding: 15px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+
+        .live-map { background: #dcdde1; height: 150px; border-radius: 12px; margin: 15px; position: relative; overflow: hidden; display: none; border: 2px solid #bdc3c7;}
+        .map-dot { width: 15px; height: 15px; background: var(--blue); border-radius: 50%; position: absolute; left: 10%; top: 50%; transform: translateY(-50%); box-shadow: 0 0 10px var(--blue); transition: left 0.5s linear;}
+        .map-dest { width: 20px; height: 20px; background: var(--primary); position: absolute; right: 10%; top: 50%; transform: translateY(-50%); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+
+        /* --- RESTAURANT UI --- */
+        .dash-header { background: #353b48; color: white; padding: 15px; text-align: center; }
+        .inventory-panel { display: flex; justify-content: space-around; background: white; padding: 10px; border-bottom: 1px solid #ddd; font-size: 0.8rem; font-weight: bold;}
+        .inv-item { text-align: center; }
+        .inv-item span { color: var(--danger); display: block; font-size: 1.1rem;}
+        
+        .kitchen-area { padding: 15px; display: none; }
+        .station { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px; text-align: center; border-left: 5px solid #718093;}
+        .station.active { border-color: var(--warn); }
+        .temp-gauge { height: 20px; background: #eee; border-radius: 10px; margin: 15px 0; position: relative; overflow: hidden; }
+        .temp-fill { height: 100%; width: 0%; background: var(--warn); transition: 0.1s; }
+        .temp-zone { position: absolute; left: 70%; right: 10%; height: 100%; background: rgba(76, 209, 55, 0.3); border-left: 2px solid var(--secondary); border-right: 2px solid var(--secondary); pointer-events: none;}
+        
+        .k-btn { background: #718093; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; font-size: 1.1rem; cursor: pointer;}
+        .k-btn.active { background: var(--primary); }
+
+        /* --- RIDER UI & CANVAS --- */
+        #game-canvas { width: 100%; height: 50vh; background: #2d3436; border-bottom: 5px solid #fff; display: block; }
+        .rider-hud { padding: 15px; background: #1e272e; color: white; display: flex; justify-content: space-between; font-family: monospace; font-size: 1.1rem; }
+        .steer-zone { display: flex; height: calc(50vh - 50px); background: #353b48; }
+        .steer-half { flex: 1; display: flex; justify-content: center; align-items: center; font-size: 3rem; color: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.05); cursor: pointer; user-select: none; touch-action: manipulation;}
+        .steer-half:active { background: rgba(255,255,255,0.1); color: var(--secondary); }
+
+        /* --- CHAT SYSTEM --- */
+        .chat-box { padding: 15px; background: white; margin: 15px; border-radius: 12px; border: 1px solid #ddd; display: none; max-height: 200px; overflow-y: auto;}
+        .msg { padding: 8px 12px; border-radius: 15px; margin-bottom: 8px; font-size: 0.85rem; max-width: 80%; }
+        .msg.cust { background: #e1f5fe; align-self: flex-start; border-bottom-left-radius: 0; }
+        .msg.rider { background: #e8f5e9; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; text-align: right;}
+
+        .toast { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; z-index: 9999; animation: fadeOut 3s forwards; pointer-events: none; white-space: nowrap;}
+        @keyframes fadeOut { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* Floating action buttons */
+        #cart-fab { position: absolute; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: var(--primary); color: white; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; box-shadow: 0 5px 15px rgba(232, 65, 24, 0.4); cursor: pointer; z-index: 400;}
+        .badge-count { position: absolute; top: 0; right: 0; background: var(--warn); color: var(--dark); border-radius: 50%; width: 20px; height: 20px; font-size: 0.8rem; font-weight: bold; display: flex; justify-content: center; align-items: center; border: 2px solid white;}
+    </style>
+</head>
+<body>
+
+    <div id="device">
+        <!-- OS BAR -->
+        <div class="os-bar">
+            <span id="os-time">12:00</span>
+            <span class="weather-alert" id="weather-alert">⛈️ STORMY (SURGE)</span>
+            <span>LTE 🔋98%</span>
+        </div>
+
+        <!-- TABS -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(1, this)">Customer</div>
+            <div class="tab" onclick="switchTab(2, this)">Restaurant</div>
+            <div class="tab" onclick="switchTab(3, this)">Rider Game</div>
+        </div>
+
+        <!-- ================= POV 1: CUSTOMER ================= -->
+        <div class="view active" id="view-1">
+            <div class="banner">
+                <h2>Craving Something?</h2>
+                <p>Lightning fast delivery to your door.</p>
+            </div>
+
+            <div class="live-map" id="live-map">
+                <div class="map-dot" id="map-dot"></div>
+                <div class="map-dest"></div>
+                <div style="position:absolute; bottom:5px; width:100%; text-align:center; font-size:0.8rem; font-weight:bold; color:var(--dark);">Tracking Rider...</div>
+            </div>
+
+            <div class="chat-box" id="cust-chat"></div>
+
+            <div class="menu-grid" id="menu-area">
+                <!-- Dynamic Items -->
+            </div>
+
+            <div id="cart-fab" onclick="toggleCart()">🛒<div class="badge-count" id="cart-count">0</div></div>
+
+            <!-- Advanced Cart Modal -->
+            <div class="cart-modal" id="cart-modal">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h2>Checkout</h2>
+                    <span style="font-size:1.5rem; cursor:pointer;" onclick="toggleCart()">×</span>
+                </div>
+                
+                <div id="bill-details">
+                    <div class="bill-row"><span>Items Total</span><span id="b-items">₹0</span></div>
+                    <div class="bill-row"><span>Delivery Fee</span><span id="b-del">₹40</span></div>
+                    <div class="bill-row"><span>Platform Fee</span><span>₹5</span></div>
+                    <div class="bill-row" id="surge-row" style="display:none; color:var(--danger);"><span>Weather Surge</span><span id="b-surge">₹0</span></div>
+                    <div class="bill-row" style="color:var(--secondary);"><span>Promo Discount</span><span id="b-disc">-₹0</span></div>
+                    <div class="bill-row total"><span>Grand Total</span><span id="b-total">₹0</span></div>
+                </div>
+
+                <div class="promo-box">
+                    <input type="text" id="promo-input" placeholder="Promo code (Try: FREEFOOD)">
+                    <button onclick="applyPromo()">Apply</button>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button style="flex:1; padding:10px; border-radius:8px; border:1px solid #ccc; background:white; cursor:pointer;" onclick="addTip(20)">Tip ₹20</button>
+                    <button style="flex:1; padding:10px; border-radius:8px; border:1px solid #ccc; background:white; cursor:pointer;" onclick="addTip(50)">Tip ₹50</button>
+                </div>
+
+                <button class="checkout-btn" id="btn-pay" onclick="placeOrder()">Pay & Place Order</button>
+            </div>
+        </div>
+
+        <!-- ================= POV 2: RESTAURANT ================= -->
+        <div class="view" id="view-2">
+            <div class="dash-header">
+                <h2>Merchant OS</h2>
+                <p>Revenue: ₹<span id="merch-rev">0</span></p>
+            </div>
+            
+            <div class="inventory-panel">
+                <div class="inv-item">Buns/Dough <span id="inv-bread">10</span></div>
+                <div class="inv-item">Veggies <span id="inv-veg">15</span></div>
+                <div class="inv-item">Meat/Cheese <span id="inv-protein">8</span></div>
+            </div>
+
+            <div style="padding: 20px; text-align:center;" id="rest-waiting">
+                <h3 style="color:#aaa;">Waiting for Incoming Orders...</h3>
+                <button style="margin-top:20px; padding:10px; background:#f5f6fa; border:1px solid #ddd; cursor:pointer;" onclick="restock()">📦 Restock Inventory (-₹100)</button>
+            </div>
+
+            <div class="kitchen-area" id="kitchen-area">
+                <div style="background:var(--warn); padding:10px; border-radius:8px; margin-bottom:15px; font-weight:bold; text-align:center;">
+                    ORDER #<span id="order-id"></span> RECEIVED
+                </div>
+
+                <!-- Kitchen Minigame -->
+                <div class="station active" id="st-prep">
+                    <h3>1. Prep Station</h3>
+                    <p style="font-size:0.8rem; color:#777;">Click rapidly to chop ingredients!</p>
+                    <button class="k-btn active" id="btn-chop" onclick="chopFood()">CHOP (0/5)</button>
+                </div>
+
+                <div class="station" id="st-cook">
+                    <h3>2. Cooking Station</h3>
+                    <p style="font-size:0.8rem; color:#777;">Hold to cook. Stop in the GREEN zone!</p>
+                    <div class="temp-gauge">
+                        <div class="temp-zone"></div>
+                        <div class="temp-fill" id="temp-fill"></div>
+                    </div>
+                    <button class="k-btn" id="btn-fire">HOLD TO HEAT</button>
+                </div>
+
+                <div class="station" id="st-pack">
+                    <h3>3. Packing</h3>
+                    <button class="k-btn" id="btn-pack-final" onclick="dispatchOrder()">SEAL & DISPATCH</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= POV 3: RIDER ================= -->
+        <div class="view" id="view-3" style="display:flex; flex-direction:column; padding-bottom:0;">
+            <div id="rider-wait" style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#1e272e; color:white; text-align:center; padding:20px;">
+                <h1 style="color:var(--rider-green);">Rider Portal</h1>
+                <p style="margin:20px 0; color:#aaa;">No active deliveries assigned.</p>
+                <div style="font-size:1.2rem; font-weight:bold;">Total Earnings: ₹<span id="rider-rev">0</span></div>
+            </div>
+
+            <div id="rider-game" style="display:none; flex-direction:column; height:100%;">
+                <div class="rider-hud">
+                    <span>⛽ <span id="hud-fuel">100</span>%</span>
+                    <span>💰 ₹<span id="hud-coin">0</span></span>
+                    <span>🏁 <span id="hud-dist">5.0</span>KM</span>
+                </div>
+                
+                <canvas id="game-canvas" width="420" height="400"></canvas>
+                
+                <div class="steer-zone">
+                    <div class="steer-half" id="steer-left">⬅️</div>
+                    <div class="steer-half" id="steer-right">➡️</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio -->
+    <audio id="sfx-ding"><source src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3" type="audio/mpeg"></audio>
+    <audio id="sfx-cash"><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>
+
+    <script>
+        /* =========================================================================
+           GLOBAL STATE & UTILS
+           ========================================================================= */
+        const state = {
+            weather: 'CLEAR', // CLEAR or STORM
+            cart: [],
+            cartTotal: 0,
+            tip: 0,
+            discount: 0,
+            surge: 0,
+            inv: { bread: 10, veg: 15, protein: 8 },
+            merchRev: 0,
+            riderRev: 0,
+            orderActive: false
+        };
+
+        const menuItems = [
+            { id: 1, name: "Premium Z-Burger", price: 299, img: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80" },
+            { id: 2, name: "Truffle Pizza", price: 499, img: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&q=80" },
+            { id: 3, name: "Spicy Ramen Bowl", price: 350, img: "https://images.unsplash.com/photo-1552611052-33e04de081de?w=400&q=80" },
+            { id: 4, name: "Iced Caramel Latte", price: 180, img: "https://images.unsplash.com/photo-1461023058943-0708e5c14abc?w=400&q=80" }
+        ];
+
+        function playSound(id) { let a = document.getElementById(id); if(a){ a.currentTime=0; a.play().catch(()=>{}); } }
+        function showToast(msg) {
+            let t = document.createElement('div'); t.className = 'toast'; t.innerText = msg;
+            document.getElementById('device').appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        setInterval(() => {
+            let d = new Date();
+            document.getElementById('os-time').innerText = d.getHours().toString().padStart(2,'0') + ":" + d.getMinutes().toString().padStart(2,'0');
+        }, 1000);
+
+        // Dynamic Weather Engine
+        setInterval(() => {
+            if(!state.orderActive) {
+                state.weather = Math.random() > 0.7 ? 'STORM' : 'CLEAR';
+                let alertUI = document.getElementById('weather-alert');
+                let surgeUI = document.querySelectorAll('.surge-badge');
+                if(state.weather === 'STORM') {
+                    alertUI.style.display = 'block';
+                    state.surge = 50;
+                    surgeUI.forEach(el => el.style.display = 'block');
+                } else {
+                    alertUI.style.display = 'none';
+                    state.surge = 0;
+                    surgeUI.forEach(el => el.style.display = 'none');
+                }
+                updateBill();
+            }
+        }, 15000);
+
+        function switchTab(idx, el) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-'+idx).classList.add('active');
+        }
+
+        /* =========================================================================
+           POV 1: CUSTOMER LOGIC
+           ========================================================================= */
+        function initMenu() {
+            let grid = document.getElementById('menu-area');
+            grid.innerHTML = '';
+            menuItems.forEach(item => {
+                grid.innerHTML += `
+                    <div class="item-card">
+                        <div class="surge-badge">SURGE</div>
+                        <img src="${item.img}">
+                        <div class="item-title">${item.name}</div>
+                        <div class="item-price">₹${item.price}</div>
+                        <button class="add-btn" onclick="addCart(${item.id})">Add to Cart</button>
+                    </div>
+                `;
+            });
+        }
+        initMenu();
+
+        let isCartOpen = false;
+        function toggleCart() {
+            isCartOpen = !isCartOpen;
+            document.getElementById('cart-modal').classList.toggle('open', isCartOpen);
+        }
+
+        function addCart(id) {
+            if(state.orderActive) return showToast("Finish current order first!");
+            let item = menuItems.find(i => i.id === id);
+            state.cart.push(item);
+            state.cartTotal += item.price;
+            document.getElementById('cart-count').innerText = state.cart.length;
+            updateBill();
+            playSound('sfx-ding');
+        }
+
+        function addTip(amt) { state.tip = amt; updateBill(); showToast(`₹${amt} Tip Added for Rider!`); }
+
+        function applyPromo() {
+            let code = document.getElementById('promo-input').value.toUpperCase();
+            if(code === 'FREEFOOD') {
+                state.discount = state.cartTotal * 0.5; // 50% off food
+                showToast("Promo Applied! 50% Off Food.");
+            } else { showToast("Invalid Code"); }
+            updateBill();
+        }
+
+        function updateBill() {
+            document.getElementById('b-items').innerText = '₹' + state.cartTotal;
+            document.getElementById('b-surge').innerText = '₹' + state.surge;
+            document.getElementById('surge-row').style.display = state.surge > 0 ? 'flex' : 'none';
+            document.getElementById('b-disc').innerText = '-₹' + state.discount.toFixed(0);
+            
+            let delFee = 40;
+            let platFee = 5;
+            let grand = state.cartTotal + delFee + platFee + state.surge + state.tip - state.discount;
+            grand = Math.max(0, grand);
+            document.getElementById('b-total').innerText = '₹' + grand.toFixed(0);
+            
+            document.getElementById('btn-pay').innerText = `Pay ₹${grand.toFixed(0)} & Order`;
+            document.getElementById('btn-pay').disabled = state.cart.length === 0;
+        }
+
+        function placeOrder() {
+            if(state.cart.length === 0) return;
+            if(state.inv.bread < 1 || state.inv.veg < 1 || state.inv.protein < 1) {
+                return showToast("Restaurant out of stock! Try later.");
+            }
+            
+            // Deduct Inventory
+            state.inv.bread--; state.inv.veg--; state.inv.protein--;
+            document.getElementById('inv-bread').innerText = state.inv.bread;
+            document.getElementById('inv-veg').innerText = state.inv.veg;
+            document.getElementById('inv-protein').innerText = state.inv.protein;
+
+            state.orderActive = true;
+            toggleCart();
+            playSound('sfx-cash');
+            showToast("Payment Successful!");
+            
+            // Route to Merchant
+            document.getElementById('order-id').innerText = Math.floor(Math.random()*9000+1000);
+            document.getElementById('rest-waiting').style.display = 'none';
+            document.getElementById('kitchen-area').style.display = 'block';
+            
+            // Notification on tabs
+            document.querySelectorAll('.tab')[1].innerHTML = 'Restaurant 🔴';
+        }
+
+        /* =========================================================================
+           POV 2: RESTAURANT / KITCHEN LOGIC
+           ========================================================================= */
+        window.restock = function() {
+            if(state.merchRev >= 100 || state.riderRev > 0) { // leniency for prototype
+                state.inv.bread += 10; state.inv.veg += 15; state.inv.protein += 10;
+                document.getElementById('inv-bread').innerText = state.inv.bread;
+                document.getElementById('inv-veg').innerText = state.inv.veg;
+                document.getElementById('inv-protein').innerText = state.inv.protein;
+                showToast("Inventory Restocked!");
+            } else {
+                showToast("Not enough revenue to restock!");
+            }
+        };
+
+        let chopC = 0;
+        window.chopFood = function() {
+            if(!document.getElementById('st-prep').classList.contains('active')) return;
+            chopC++;
+            document.getElementById('btn-chop').innerText = `CHOP (${chopC}/5)`;
+            if(chopC >= 5) {
+                document.getElementById('btn-chop').innerText = `PREPPED ✓`;
+                document.getElementById('st-prep').classList.remove('active');
+                document.getElementById('st-cook').classList.add('active');
+                document.getElementById('btn-fire').classList.add('active');
+                chopC = 0;
+                chatNotify("Chef", "Prepped ingredients, cooking now.");
+            }
+        };
+
+        const btnFire = document.getElementById('btn-fire');
+        let heatInt; let heatVal = 0;
+        btnFire.addEventListener('pointerdown', (e) => {
+            if(!document.getElementById('st-cook').classList.contains('active')) return;
+            e.preventDefault();
+            btnFire.innerText = "HEATING... 🔥";
+            heatInt = setInterval(() => {
+                heatVal += 2;
+                document.getElementById('temp-fill').style.width = heatVal + '%';
+                if(heatVal > 90) { // Burned!
+                    clearInterval(heatInt);
+                    showToast("💥 FOOD BURNED! Minus ₹50 penalty.");
+                    state.merchRev -= 50; updateRev();
+                    resetKitchen();
+                }
+            }, 50);
+        });
+
+        function stopHeat() {
+            if(!document.getElementById('st-cook').classList.contains('active')) return;
+            clearInterval(heatInt);
+            btnFire.innerText = "STOPPED";
+            // Check if in zone (70 to 90)
+            if(heatVal >= 70 && heatVal <= 90) {
+                document.getElementById('st-cook').classList.remove('active');
+                document.getElementById('st-pack').classList.add('active');
+                document.getElementById('btn-pack-final').classList.add('active');
+                chatNotify("Chef", "Food cooked perfectly! Packing.");
+            } else {
+                showToast("Undercooked! Try again.");
+                heatVal = 0; document.getElementById('temp-fill').style.width = '0%';
+                btnFire.innerText = "HOLD TO HEAT";
+            }
+        }
+        btnFire.addEventListener('pointerup', stopHeat);
+        btnFire.addEventListener('pointerleave', stopHeat);
+
+        window.dispatchOrder = function() {
+            state.merchRev += state.cartTotal; // Restaurant gets food cost
+            updateRev();
+            resetKitchen();
+            
+            // Route to Rider
+            document.querySelectorAll('.tab')[1].innerHTML = 'Restaurant';
+            document.querySelectorAll('.tab')[2].innerHTML = 'Rider Game 🔴';
+            
+            document.getElementById('rider-wait').style.display = 'none';
+            document.getElementById('rider-game').style.display = 'flex';
+            
+            chatNotify("System", "Rider assigned to order.");
+            startRiderGame();
+        };
+
+        function resetKitchen() {
+            document.getElementById('kitchen-area').style.display = 'none';
+            document.getElementById('rest-waiting').style.display = 'block';
+            document.getElementById('st-prep').classList.add('active');
+            document.getElementById('st-cook').classList.remove('active');
+            document.getElementById('st-pack').classList.remove('active');
+            document.getElementById('btn-fire').classList.remove('active');
+            document.getElementById('btn-pack-final').classList.remove('active');
+            heatVal = 0; document.getElementById('temp-fill').style.width = '0%';
+            document.getElementById('btn-chop').innerText = "CHOP (0/5)";
+        }
+
+        function updateRev() {
+            document.getElementById('merch-rev').innerText = state.merchRev;
+            document.getElementById('rider-rev').innerText = state.riderRev;
+        }
+
+        /* =========================================================================
+           POV 3: RIDER CANVAS ENGINE (OVER-ENGINEERED)
+           ========================================================================= */
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let rGame = {
+            active: false, steer: 0, x: 210, speed: 6, dist: 5.0, fuel: 100, coins: 0,
+            roadOffset: 0, entities: [], timeOfDay: 0 // 0=Day, to 255=Night
+        };
+
+        document.getElementById('steer-left').addEventListener('pointerdown', e=>{e.preventDefault(); rGame.steer = -1;});
+        document.getElementById('steer-left').addEventListener('pointerup', e=>{e.preventDefault(); rGame.steer = 0;});
+        document.getElementById('steer-left').addEventListener('pointerleave', e=>{e.preventDefault(); rGame.steer = 0;});
+        
+        document.getElementById('steer-right').addEventListener('pointerdown', e=>{e.preventDefault(); rGame.steer = 1;});
+        document.getElementById('steer-right').addEventListener('pointerup', e=>{e.preventDefault(); rGame.steer = 0;});
+        document.getElementById('steer-right').addEventListener('pointerleave', e=>{e.preventDefault(); rGame.steer = 0;});
+
+        function startRiderGame() {
+            rGame = { active: true, steer: 0, x: canvas.width/2, speed: state.weather==='STORM'?4:7, dist: 5.0, fuel: 100, coins: 0, roadOffset: 0, entities: [], timeOfDay: 0 };
+            document.getElementById('live-map').style.display = 'block'; // Turn on customer map
+            requestAnimationFrame(riderLoop);
+        }
+
+        function riderLoop() {
+            if(!rGame.active) return;
+
+            // Day/Night and Weather Rendering
+            rGame.timeOfDay = Math.min(200, rGame.timeOfDay + 0.1);
+            let bgL = 45 - (rGame.timeOfDay/10); // Road darkens
+            
+            ctx.fillStyle = `#111`; ctx.fillRect(0,0, canvas.width, canvas.height); // Grass
+            ctx.fillStyle = `hsl(210, 10%, ${bgL}%)`; ctx.fillRect(40,0, canvas.width-80, canvas.height); // Road
+
+            // Road Lines
+            rGame.roadOffset += rGame.speed; if(rGame.roadOffset > 40) rGame.roadOffset = 0;
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            for(let i=-1; i<12; i++) {
+                ctx.fillRect(canvas.width/3, i*40+rGame.roadOffset, 5, 20);
+                ctx.fillRect((canvas.width/3)*2, i*40+rGame.roadOffset, 5, 20);
+            }
+
+            // Move Bike
+            rGame.x += rGame.steer * 5;
+            if(rGame.x < 50) rGame.x = 50;
+            if(rGame.x > canvas.width - 70) rGame.x = canvas.width - 70;
+
+            // Draw Bike
+            ctx.fillStyle = varColor = '#00b894'; ctx.fillRect(rGame.x, 300, 25, 45); // Body
+            ctx.fillStyle = '#fff'; ctx.fillRect(rGame.x+5, 295, 15, 10); // Headlight effect
+            
+            // Storm overlay
+            if(state.weather === 'STORM') {
+                ctx.fillStyle = "rgba(10, 132, 255, 0.2)"; ctx.fillRect(0,0, canvas.width, canvas.height);
+                // Rain particles
+                ctx.fillStyle = "#fff";
+                for(let i=0; i<10; i++) ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 10);
+            }
+
+            // Entity Spawning (Cars, Gas, Coins)
+            if(Math.random() < 0.05) {
+                let lane = Math.floor(Math.random()*3);
+                let xPos = 60 + (lane * 100);
+                let type = Math.random();
+                let eType = type > 0.85 ? 'GAS' : (type > 0.7 ? 'COIN' : 'CAR');
+                rGame.entities.push({ x: xPos, y: -50, w: 30, h: eType==='CAR'?60:30, type: eType });
+            }
+
+            // Entity Processing
+            for(let i=0; i<rGame.entities.length; i++) {
+                let e = rGame.entities[i];
+                e.y += e.type==='CAR' ? rGame.speed - 2 : rGame.speed; // Cars move relative, items stand still on road
+                
+                // Draw
+                if(e.type === 'CAR') { ctx.fillStyle = '#ff7675'; ctx.fillRect(e.x, e.y, e.w, e.h); }
+                else if(e.type === 'GAS') { ctx.fillStyle = '#e84118'; ctx.fillRect(e.x, e.y, e.w, e.h); ctx.fillStyle='#fff'; ctx.fillText("G", e.x+10, e.y+20); }
+                else if(e.type === 'COIN') { ctx.fillStyle = '#fbc531'; ctx.beginPath(); ctx.arc(e.x+15, e.y+15, 15, 0, Math.PI*2); ctx.fill(); }
+
+                // Collision
+                if(rGame.x < e.x + e.w && rGame.x + 25 > e.x && 300 < e.y + e.h && 345 > e.y) {
+                    if(e.type === 'CAR') {
+                        rGame.active = false; alert("💥 Crashed! Restarting trip..."); startRiderGame(); return;
+                    } else if(e.type === 'GAS') {
+                        rGame.fuel = Math.min(100, rGame.fuel + 30); playSound('sfx-ding'); e.y = 999; // Hide
+                    } else if(e.type === 'COIN') {
+                        rGame.coins += 5; playSound('sfx-cash'); e.y = 999;
+                    }
+                }
+            }
+            rGame.entities = rGame.entities.filter(e => e.y < canvas.height);
+
+            // Logic Updates
+            rGame.fuel -= 0.05;
+            rGame.dist -= 0.003;
+            
+            // Sync Map in Customer POV
+            let percentDone = Math.max(0, (5.0 - rGame.dist) / 5.0) * 80;
+            document.getElementById('map-dot').style.left = `calc(10% + ${percentDone}%)`;
+
+            document.getElementById('hud-fuel').innerText = Math.max(0, rGame.fuel).toFixed(0);
+            document.getElementById('hud-coin').innerText = rGame.coins;
+            document.getElementById('hud-dist').innerText = Math.max(0, rGame.dist).toFixed(2);
+
+            if(rGame.fuel <= 0) { rGame.active = false; alert("⛽ Out of Gas! Delivery Failed."); resetGameTotal(); return; }
+
+            if(rGame.dist <= 0) {
+                rGame.active = false;
+                let finalPay = 40 + state.surge + state.tip + rGame.coins; // Delivery fee + surge + tip + highway coins
+                state.riderRev += finalPay;
+                updateRev();
+                playSound('sfx-cash');
+                showToast(`🎉 Delivery Success! Rider earned ₹${finalPay}`);
+                chatNotify("System", "Order Delivered Successfully.");
+                document.querySelectorAll('.tab')[2].innerHTML = 'Rider Game';
+                setTimeout(resetGameTotal, 3000);
+                return;
+            }
+
+            requestAnimationFrame(riderLoop);
+        }
+
+        /* =========================================================================
+           CHAT SYSTEM & RESET LOGIC
+           ========================================================================= */
+        function chatNotify(sender, text) {
+            let cb = document.getElementById('cust-chat');
+            cb.style.display = 'block';
+            let c = sender === 'Chef' || sender === 'System' ? 'rider' : 'cust';
+            cb.innerHTML += `<div class="msg ${c}"><b>${sender}:</b> ${text}</div>`;
+            cb.scrollTop = cb.scrollHeight;
+        }
+
+        function resetGameTotal() {
+            state.orderActive = false;
+            state.cart = []; state.cartTotal = 0; state.tip = 0; state.discount = 0;
+            document.getElementById('cart-count').innerText = "0";
+            updateBill();
+            
+            // UI Resets
+            document.getElementById('live-map').style.display = 'none';
+            document.getElementById('map-dot').style.left = '10%';
+            document.getElementById('cust-chat').innerHTML = '';
+            document.getElementById('cust-chat').style.display = 'none';
+            
+            document.getElementById('rider-wait').style.display = 'flex';
+            document.getElementById('rider-game').style.display = 'none';
+            
+            switchTab(1, document.querySelectorAll('.tab')[0]); // Back to customer
+        }
+
+    </script>
+</body>
+</html>
